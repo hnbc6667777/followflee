@@ -8,7 +8,7 @@
 - 📖 章节阅读功能
 - 🎨 响应式设计
 - 🚀 轻量快速
-- 💾 内存数据存储（可扩展为数据库）
+- 💾 **SQLite数据库持久化存储**（已完成迁移）
 
 ## 安装和运行
 
@@ -50,53 +50,105 @@ stack run
 
 ## 数据结构
 
-### 小说 (Novel)
+### 小说 (Novel) - 数据库版本
 ```haskell
 data Novel = Novel
     { novelId :: Int
     , title :: Text
     , author :: Text
     , description :: Text
-    , chapters :: [Chapter]
+    , createdAt :: Text
     }
 ```
 
-### 章节 (Chapter)
+### 章节 (Chapter) - 数据库版本
 ```haskell
 data Chapter = Chapter
     { chapterId :: Int
+    , chapterNovelId :: Int
     , chapterTitle :: Text
     , content :: Text
+    , chapterCreatedAt :: Text
     }
+```
+
+## 数据库功能
+
+### ✅ 已实现的数据库功能
+
+- **SQLite数据库集成** - 完整的数据持久化支持
+- **自动数据库初始化** - 首次运行自动创建数据库和表结构
+- **示例数据插入** - 包含3本小说和6个章节的示例数据
+- **CRUD操作** - 完整的增删改查功能
+- **外键关联** - novels和chapters表的完整关联
+
+### 数据库表结构
+
+```sql
+-- novels表
+CREATE TABLE novels (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    author TEXT NOT NULL,
+    description TEXT NOT NULL,
+    createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- chapters表  
+CREATE TABLE chapters (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    novelId INTEGER NOT NULL,
+    title TEXT NOT NULL,
+    content TEXT NOT NULL,
+    createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (novelId) REFERENCES novels(id)
+);
 ```
 
 ## 扩展功能
 
 ### 添加更多小说
 
-在 `novels` 列表中添加新的小说数据：
+应用现在使用SQLite数据库存储数据。要添加新小说，可以通过以下方式：
 
-```haskell
-novels =
-    [ -- 现有小说...
-    , Novel 4 "新小说标题" "作者名" "小说描述"
-        [ Chapter 1 "第一章标题" "章节内容..."
-        , Chapter 2 "第二章标题" "章节内容..."
-        ]
-    ]
-```
+1. **通过数据库管理工具**直接插入数据
+2. **扩展应用功能**添加管理员界面
+3. **使用API接口**（如果实现）
 
-### 连接数据库
+### 数据库管理
 
-当前使用内存数据，可以扩展为连接数据库：
+项目已完成SQLite数据库集成，具备以下功能：
 
-1. 添加数据库依赖（如postgresql-simple）
-2. 创建数据库表结构
-3. 实现数据库操作函数
+- ✅ 自动数据库初始化
+- ✅ 示例数据自动插入
+- ✅ 完整CRUD操作
+- ✅ 数据持久化存储
 
 ### 用户功能
 
 可以添加用户注册、登录、书架等功能。
+
+## 数据库操作示例
+
+### 查询所有小说
+```haskell
+getAllNovels :: IO [Novel]
+```
+
+### 根据ID获取小说
+```haskell
+getNovelById :: Int -> IO (Maybe Novel)
+```
+
+### 获取小说章节列表
+```haskell
+getChaptersByNovelId :: Int -> IO [Chapter]
+```
+
+### 获取章节内容
+```haskell
+getChapterById :: Int -> IO (Maybe Chapter)
+```
 
 ## 待实现功能
 
@@ -122,9 +174,10 @@ novels =
 - [ ] 热门小说排行
 
 ### 💾 数据持久化
-- [ ] 数据库集成（PostgreSQL/MySQL）
+- [x] **SQLite数据库集成**（已完成）
 - [ ] 小说数据导入/导出
 - [ ] 用户数据备份
+- [ ] 数据库备份和恢复功能
 
 ### 📱 移动端优化
 - [ ] 响应式移动端界面
@@ -148,6 +201,7 @@ novels =
 - **框架**: Scotty (Haskell Web框架)
 - **模板**: Blaze-html (HTML DSL)
 - **服务器**: Warp (高性能Web服务器)
+- **数据库**: SQLite (sqlite-simple库)
 - **数据格式**: JSON (Aeson库)
 
 ## 开发说明
@@ -157,11 +211,20 @@ novels =
 ```
 followflee/
 ├── app/
-│   └── Main.hs          # 主程序文件
-├── followflee.cabal     # 项目配置文件
+│   └── Main.hs          # 主程序文件（包含数据库功能）
+├── followflee.cabal     # 项目配置文件（包含SQLite依赖）
+├── DATABASE_MIGRATION_SUMMARY.md  # 数据库迁移详细文档
+├── CHANGELOG.md         # 项目变更日志
 ├── LICENSE              # 许可证文件
-└── README.md            # 项目说明
+├── README.md            # 项目说明
+└── followflee.db        # SQLite数据库文件（自动生成）
 ```
+
+### 数据库相关文件
+
+- `followflee.db` - SQLite数据库文件（首次运行自动生成）
+- `DATABASE_MIGRATION_SUMMARY.md` - 数据库迁移完整文档
+- `CHANGELOG.md` - 包含版本0.2.0.0的数据库迁移记录
 
 ## 许可证
 
