@@ -9,6 +9,9 @@
 - 🎨 响应式设计
 - 🚀 轻量快速
 - 💾 **SQLite数据库持久化存储**（已完成迁移）
+- 👤 **完整的用户系统**（注册、登录、会话管理）
+- 📚 **个人书架功能**（添加、移除、查看收藏）
+- 🔐 **密码加密安全**（BCrypt哈希加密）
 
 ## 安装和运行
 
@@ -42,13 +45,34 @@ stack run
 
 ## 网站结构
 
+### 页面路由
 - `/` - 首页，展示推荐小说
 - `/novels` - 小说列表页
 - `/novel/:id` - 小说详情页（章节列表）
 - `/chapter/:novelId/:chapterId` - 章节阅读页
+- `/bookshelf` - 个人书架页（需要登录）
 - `/about` - 关于页面
 
+### 用户认证路由
+- `/login` - 登录页面
+- `/register` - 注册页面
+- `/logout` - 退出登录
+
+### 书架操作路由
+- `/bookshelf/add/:novelId` - 添加到书架（POST）
+- `/bookshelf/remove/:novelId` - 从书架移除（POST）
+
 ## 数据结构
+
+### 用户 (User) - 数据库版本
+```haskell
+data User = User
+    { userId :: Int
+    , username :: Text
+    , passwordHash :: Text
+    , createdAt :: Text
+    }
+```
 
 ### 小说 (Novel) - 数据库版本
 ```haskell
@@ -72,6 +96,16 @@ data Chapter = Chapter
     }
 ```
 
+### 书架 (Bookshelf) - 数据库版本
+```haskell
+data Bookshelf = Bookshelf
+    { bookshelfId :: Int
+    , userId :: Int
+    , novelId :: Int
+    , addedAt :: Text
+    }
+```
+
 ## 数据库功能
 
 ### ✅ 已实现的数据库功能
@@ -85,6 +119,14 @@ data Chapter = Chapter
 ### 数据库表结构
 
 ```sql
+-- users表
+CREATE TABLE users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT UNIQUE NOT NULL,
+    passwordHash TEXT NOT NULL,
+    createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
 -- novels表
 CREATE TABLE novels (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -102,6 +144,17 @@ CREATE TABLE chapters (
     content TEXT NOT NULL,
     createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (novelId) REFERENCES novels(id)
+);
+
+-- bookshelf表
+CREATE TABLE bookshelf (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    userId INTEGER NOT NULL,
+    novelId INTEGER NOT NULL,
+    addedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (userId) REFERENCES users(id),
+    FOREIGN KEY (novelId) REFERENCES novels(id),
+    UNIQUE(userId, novelId)
 );
 ```
 
@@ -150,47 +203,64 @@ getChaptersByNovelId :: Int -> IO [Chapter]
 getChapterById :: Int -> IO (Maybe Chapter)
 ```
 
-## 待实现功能
+## 功能状态
 
-以下是网站当前版本尚未实现但计划在未来版本中添加的功能：
+### ✅ 已实现功能
 
-### 🔐 用户系统
-- [ ] 用户注册和登录功能
+#### 🔐 用户系统
+- [x] 用户注册和登录功能
+- [x] 密码加密和安全存储（BCrypt哈希加密）
+- [x] 会话管理（基于IORef的内存会话）
+- [x] 退出登录功能
+
+#### 📚 书架功能
+- [x] 个人书架功能
+- [x] 添加小说到书架
+- [x] 从书架移除小说
+- [x] 查看个人书架
+
+#### 💾 数据持久化
+- [x] SQLite数据库集成
+- [x] 自动数据库初始化
+- [x] 示例数据插入
+- [x] 完整CRUD操作
+
+#### 📖 小说阅读
+- [x] 小说列表展示
+- [x] 章节阅读功能
+- [x] 响应式设计
+
+### 🔄 待实现功能
+
+#### 🔐 用户系统增强
 - [ ] 用户个人资料管理
-- [ ] 密码加密和安全存储
 - [ ] 用户权限管理
+- [ ] 密码重置功能
 
-### 📚 阅读体验优化
+#### 📚 阅读体验优化
 - [ ] 阅读进度保存
 - [ ] 书签功能
 - [ ] 夜间模式
 - [ ] 字体大小调整
 - [ ] 阅读背景色自定义
 
-### 🔍 搜索和筛选
+#### 🔍 搜索和筛选
 - [ ] 小说搜索功能
 - [ ] 按分类筛选小说
 - [ ] 按作者筛选
 - [ ] 热门小说排行
 
-### 💾 数据持久化
-- [x] **SQLite数据库集成**（已完成）
-- [ ] 小说数据导入/导出
-- [ ] 用户数据备份
-- [ ] 数据库备份和恢复功能
-
-### 📱 移动端优化
-- [ ] 响应式移动端界面
+#### 📱 移动端优化
 - [ ] PWA支持
 - [ ] 离线阅读功能
 
-### 🔔 互动功能
+#### 🔔 互动功能
 - [ ] 评论系统
 - [ ] 评分功能
 - [ ] 小说推荐算法
 - [ ] 阅读统计
 
-### 🛠️ 管理功能
+#### 🛠️ 管理功能
 - [ ] 管理员后台
 - [ ] 小说内容管理
 - [ ] 用户管理
@@ -203,6 +273,9 @@ getChapterById :: Int -> IO (Maybe Chapter)
 - **服务器**: Warp (高性能Web服务器)
 - **数据库**: SQLite (sqlite-simple库)
 - **数据格式**: JSON (Aeson库)
+- **密码加密**: BCrypt (用于用户密码安全存储)
+- **会话管理**: IORef (内存会话管理)
+- **HTML表单处理**: Scotty的表单参数处理
 
 ## 开发说明
 
