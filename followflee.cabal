@@ -82,7 +82,9 @@ executable followflee
                      bytestring >=0.10,
                      filepath >=1.4,
                      directory >=1.3,
-                     http-types >=0.12
+                     http-types >=0.12,
+                     sqlite-simple >=0.4,
+                     time >=1.9
 
     -- Directories containing source files.
     hs-source-dirs:   app
