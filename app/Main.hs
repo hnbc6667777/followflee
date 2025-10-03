@@ -23,6 +23,7 @@ import Database.SQLite.Simple (Only(..))
 import Control.Monad (forM_)
 import Control.Monad.IO.Class (liftIO)
 import Data.Time.Clock (UTCTime, getCurrentTime)
+import Data.Time.Format (defaultTimeLocale, formatTime)
 import Crypto.BCrypt (hashPasswordUsingPolicy, slowerBcryptHashingPolicy, validatePassword)
 import qualified Data.Text as TS
 import qualified Data.ByteString.Char8 as BSC
@@ -97,6 +98,21 @@ instance ToRow Chapter where
 databasePath :: FilePath
 databasePath = "followflee.db"
 
+-- 阅读进度数据结构
+data ReadingProgress = ReadingProgress
+    { progressId :: Int
+    , progressUserId :: Int
+    , progressNovelId :: Int
+    , progressChapterId :: Int
+    , lastReadAt :: Maybe UTCTime
+    } deriving (Show)
+
+instance FromRow ReadingProgress where
+    fromRow = ReadingProgress <$> field <*> field <*> field <*> field <*> field
+
+instance ToRow ReadingProgress where
+    toRow (ReadingProgress id uid nid cid readAt) = toRow (id, uid, nid, cid, readAt)
+
 -- 初始化数据库
 initializeDatabase :: IO ()
 initializeDatabase = do
@@ -105,6 +121,7 @@ initializeDatabase = do
     execute_ conn "CREATE TABLE IF NOT EXISTS novels (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL, author TEXT NOT NULL, description TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)"
     execute_ conn "CREATE TABLE IF NOT EXISTS chapters (id INTEGER PRIMARY KEY AUTOINCREMENT, novel_id INTEGER NOT NULL, chapter_number INTEGER NOT NULL, title TEXT NOT NULL, content TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY (novel_id) REFERENCES novels (id))"
     execute_ conn "CREATE TABLE IF NOT EXISTS bookshelf (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, novel_id INTEGER NOT NULL, added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY (user_id) REFERENCES users (id), FOREIGN KEY (novel_id) REFERENCES novels (id), UNIQUE(user_id, novel_id))"
+    execute_ conn "CREATE TABLE IF NOT EXISTS reading_progress (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, novel_id INTEGER NOT NULL, chapter_id INTEGER NOT NULL, last_read_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY (user_id) REFERENCES users (id), FOREIGN KEY (novel_id) REFERENCES novels (id), FOREIGN KEY (chapter_id) REFERENCES chapters (id), UNIQUE(user_id, novel_id))"
     close conn
     putStrLn "数据库初始化完成"
 
@@ -258,6 +275,39 @@ isInBookshelf userId novelId = do
         [Only count] -> return (count > 0)
         _ -> return False
 
+-- 阅读进度相关数据库操作
+-- 保存阅读进度
+saveReadingProgress :: Int -> Int -> Int -> IO Bool
+saveReadingProgress userId novelId chapterId = do
+    conn <- open databasePath
+    result <- tryExecute conn "INSERT OR REPLACE INTO reading_progress (user_id, novel_id, chapter_id) VALUES (?,?,?)" (userId, novelId, chapterId)
+    close conn
+    return result
+  where
+    tryExecute conn query params = do
+        result <- try $ execute conn query params
+        case result of
+            Right _ -> return True
+            Left (_ :: SomeException) -> return False
+
+-- 获取用户的阅读进度
+getReadingProgress :: Int -> Int -> IO (Maybe ReadingProgress)
+getReadingProgress userId novelId = do
+    conn <- open databasePath
+    progress <- query conn "SELECT id, user_id, novel_id, chapter_id, last_read_at FROM reading_progress WHERE user_id = ? AND novel_id = ?" (userId, novelId)
+    close conn
+    case progress of
+        [p] -> return (Just p)
+        _ -> return Nothing
+
+-- 获取用户所有小说的阅读进度
+getAllReadingProgress :: Int -> IO [ReadingProgress]
+getAllReadingProgress userId = do
+    conn <- open databasePath
+    progress <- query conn "SELECT id, user_id, novel_id, chapter_id, last_read_at FROM reading_progress WHERE user_id = ? ORDER BY last_read_at DESC" (Only userId)
+    close conn
+    return progress
+
 -- 数据库操作函数
 -- 获取所有小说
 getAllNovels :: IO [Novel]
@@ -371,13 +421,34 @@ novelsPage mUser = do
             mapM_ (novelCard mUser) novels
 
 -- 小说详情页
-novelDetailPage :: Novel -> IO H.Html
-novelDetailPage novel = do
+novelDetailPage :: Novel -> Maybe User -> IO H.Html
+novelDetailPage novel mUser = do
     chapters <- getChaptersByNovelId (novelId novel)
+    
+    -- 获取阅读进度
+    mProgress <- case mUser of
+        Just user -> getReadingProgress (userId user) (novelId novel)
+        Nothing -> return Nothing
+    
+    -- 获取最后阅读的章节
+    let lastChapterId = case mProgress of
+            Just progress -> Just (progressChapterId progress)
+            Nothing -> Nothing
+    
     return $ do
         H.h2 $ H.toHtml (title novel)
         H.p ! A.style "color: #666;" $ "作者：" >> H.toHtml (author novel)
         H.p ! A.style "color: #888; margin-bottom: 2rem;" $ H.toHtml (description novel)
+        
+        -- 显示继续阅读按钮（如果有阅读进度）
+        case (mUser, lastChapterId) of
+            (Just user, Just chapterId) -> 
+                H.div ! A.style "margin-bottom: 2rem;" $ do
+                    H.a ! A.href (H.toValue $ "/chapter/" `T.append` T.pack (show (novelId novel)) 
+                            `T.append` "/" `T.append` T.pack (show chapterId))
+                      ! A.style "background: #e67e22; color: white; padding: 0.8rem 1.5rem; text-decoration: none; border-radius: 4px; font-size: 1.1rem; display: inline-block;" $
+                        "继续阅读"
+            _ -> H.div ""
         
         H.h3 "章节列表"
         H.ul ! A.style "list-style: none; padding: 0;" $ do
@@ -392,12 +463,19 @@ chapterItem novelId chapter = do
             H.toHtml (chapterTitle chapter)
 
 -- 章节阅读页
-chapterPage :: Novel -> Chapter -> H.Html
-chapterPage novel chapter = do
+chapterPage :: Novel -> Chapter -> Maybe ReadingProgress -> H.Html
+chapterPage novel chapter mProgress = do
     H.div ! A.style "max-width: 800px; margin: 0 auto;" $ do
         H.h2 $ H.toHtml (title novel)
         H.h3 ! A.style "color: #666; border-bottom: 2px solid #3498db; padding-bottom: 0.5rem;" $ 
             H.toHtml (chapterTitle chapter)
+        
+        -- 显示阅读进度信息
+        case mProgress of
+            Just progress -> 
+                H.p ! A.style "color: #27ae60; font-size: 0.9rem; margin-top: 0.5rem;" $
+                    "上次阅读时间：" >> H.toHtml (maybe "未知" (T.pack . show) (lastReadAt progress))
+            Nothing -> H.div ""
         
         H.div ! A.style "line-height: 1.8; font-size: 1.1rem; margin-top: 2rem;" $ do
             H.pre ! A.style "white-space: pre-wrap; font-family: inherit; background: #f8f9fa; padding: 1rem; border-radius: 4px;" $
@@ -457,19 +535,36 @@ registerPage = do
 bookshelfPage :: User -> IO H.Html
 bookshelfPage user = do
     novels <- getUserBookshelf (userId user)
+    -- 获取所有小说的阅读进度
+    allProgress <- getAllReadingProgress (userId user)
+    
     return $ do
         H.h2 $ "我的书架 - " >> H.toHtml (username user)
         if null novels
             then H.p "您的书架还是空的，快去添加一些喜欢的小说吧！"
             else H.div ! A.style "display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 1.5rem; margin-top: 2rem;" $ do
-                mapM_ (bookshelfNovelCard user) novels
+                mapM_ (bookshelfNovelCard user allProgress) novels
 
-bookshelfNovelCard :: User -> Novel -> H.Html
-bookshelfNovelCard user novel = do
-    H.div ! A.style "border: 1px solid #ddd; border-radius: 8px; padding: 1rem; background: white; box-shadow: 0 2px 4px rgba(0,0,0,0.1);" $ do
+bookshelfNovelCard :: User -> [ReadingProgress] -> Novel -> H.Html
+bookshelfNovelCard user allProgress novel = 
+    let novelProgress = find (\p -> progressNovelId p == novelId novel) allProgress
+    in H.div ! A.style "border: 1px solid #ddd; border-radius: 8px; padding: 1rem; background: white; box-shadow: 0 2px 4px rgba(0,0,0,0.1);" $ do
         H.h3 ! A.style "margin-top: 0;" $ H.toHtml (title novel)
         H.p ! A.style "color: #666;" $ "作者：" >> H.toHtml (author novel)
         H.p ! A.style "color: #888; font-size: 0.9rem;" $ H.toHtml (description novel)
+        
+        -- 显示阅读进度信息
+        case novelProgress of
+            Just progress -> 
+                H.div ! A.style "background: #f8f9fa; border-left: 4px solid #3498db; padding: 0.8rem; margin-bottom: 1rem; border-radius: 4px;" $ do
+                    H.p ! A.style "margin: 0; color: #2c3e50; font-size: 0.9rem;" $ 
+                        "阅读进度：已阅读到第" >> H.toHtml (progressChapterId progress) >> "章"
+                    H.p ! A.style "margin: 0.3rem 0 0 0; color: #7f8c8d; font-size: 0.8rem;" $ 
+                        "最后阅读时间：" >> H.toHtml (maybe "未知" (\t -> T.pack $ formatTime defaultTimeLocale "%Y-%m-%d %H:%M" t) (lastReadAt progress))
+            Nothing -> 
+                H.div ! A.style "background: #fff3cd; border-left: 4px solid #ffc107; padding: 0.8rem; margin-bottom: 1rem; border-radius: 4px;" $ do
+                    H.p ! A.style "margin: 0; color: #856404; font-size: 0.9rem;" $ "尚未开始阅读"
+        
         H.div ! A.style "display: flex; gap: 0.5rem; margin-top: 1rem;" $ do
             H.a ! A.href (H.toValue $ "novel/" `T.append` T.pack (show (novelId novel))) 
               ! A.style "background: #27ae60; color: white; padding: 0.3rem 0.8rem; text-decoration: none; border-radius: 4px; display: inline-block;" $
@@ -586,7 +681,7 @@ main = do
             novel <- liftIO $ getNovelById novelId
             case novel of
                 Just n -> do
-                    page <- liftIO $ novelDetailPage n
+                    page <- liftIO $ novelDetailPage n mUser
                     S.html $ R.renderHtml $ layout mUser page
                 Nothing -> do
                     S.status status404
@@ -602,7 +697,16 @@ main = do
                 Just n -> do
                     chapter <- liftIO $ getChapterById nid cid
                     case chapter of
-                        Just c -> S.html $ R.renderHtml $ layout mUser $ chapterPage n c
+                        Just c -> do
+                            -- 如果用户已登录，保存阅读进度
+                            case mUser of
+                                Just user -> do
+                                    _ <- liftIO $ saveReadingProgress (userId user) nid cid
+                                    -- 获取阅读进度信息
+                                    progress <- liftIO $ getReadingProgress (userId user) nid
+                                    S.html $ R.renderHtml $ layout mUser $ chapterPage n c progress
+                                Nothing -> 
+                                    S.html $ R.renderHtml $ layout mUser $ chapterPage n c Nothing
                         Nothing -> do
                             S.status status404
                             S.text "章节未找到"

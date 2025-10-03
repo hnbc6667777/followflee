@@ -13,6 +13,7 @@
 - 📚 **个人书架功能**（添加、移除、查看收藏）
 - 🔐 **密码加密安全**（BCrypt哈希加密）
 - 🔑 **基于UUID令牌的会话管理**（真正的多用户支持）
+- 📊 **阅读进度记录**（自动保存阅读位置，支持继续阅读）
 
 ## 安装和运行
 
@@ -156,6 +157,19 @@ CREATE TABLE bookshelf (
     FOREIGN KEY (userId) REFERENCES users(id),
     FOREIGN KEY (novelId) REFERENCES novels(id),
     UNIQUE(userId, novelId)
+);
+
+-- reading_progress表（阅读进度记录）
+CREATE TABLE reading_progress (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    novel_id INTEGER NOT NULL,
+    chapter_id INTEGER NOT NULL,
+    last_read_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id),
+    FOREIGN KEY (novel_id) REFERENCES novels(id),
+    FOREIGN KEY (chapter_id) REFERENCES chapters(id),
+    UNIQUE(user_id, novel_id)
 );
 ```
 
