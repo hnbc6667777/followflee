@@ -12,6 +12,7 @@
 - 👤 **完整的用户系统**（注册、登录、会话管理）
 - 📚 **个人书架功能**（添加、移除、查看收藏）
 - 🔐 **密码加密安全**（BCrypt哈希加密）
+- 🔑 **基于UUID令牌的会话管理**（真正的多用户支持）
 
 ## 安装和运行
 
@@ -54,9 +55,9 @@ stack run
 - `/about` - 关于页面
 
 ### 用户认证路由
-- `/login` - 登录页面
+- `/login` - 登录页面（基于UUID令牌的会话管理）
 - `/register` - 注册页面
-- `/logout` - 退出登录
+- `/logout` - 退出登录（清除会话令牌）
 
 ### 书架操作路由
 - `/bookshelf/add/:novelId` - 添加到书架（POST）
@@ -203,6 +204,31 @@ getChaptersByNovelId :: Int -> IO [Chapter]
 getChapterById :: Int -> IO (Maybe Chapter)
 ```
 
+## 会话管理重大修复
+
+### 🔧 问题修复
+原会话管理系统存在严重缺陷：所有用户共享同一个全局变量，导致所有连接者共享同一个账户状态。
+
+### ✅ 解决方案
+实现了基于UUID令牌的会话管理系统：
+- **会话令牌**: 使用UUID.V4生成唯一会话令牌
+- **会话存储**: 使用Data.Map存储令牌到用户ID的映射
+- **Cookie管理**: 通过HTTP Cookie存储会话令牌，实现跨请求会话保持
+- **安全特性**: 设置HttpOnly标志防止XSS攻击
+
+### 🔑 核心功能
+- `generateSessionToken` - 生成唯一会话令牌
+- `getUserFromRequest` - 从Cookie中提取令牌并获取用户信息
+- `setSessionToken` - 登录时设置会话令牌
+- `clearSessionToken` - 退出登录时清除会话令牌
+
+### 📈 修复效果
+- ✅ **用户隔离**: 每个用户拥有独立的会话状态
+- ✅ **会话持久化**: 登录状态通过Cookie保持
+- ✅ **安全退出**: 退出登录时正确清除会话
+- ✅ **防XSS**: HttpOnly Cookie保护
+- ✅ **唯一令牌**: UUID确保会话令牌的唯一性
+
 ## 功能状态
 
 ### ✅ 已实现功能
@@ -210,7 +236,7 @@ getChapterById :: Int -> IO (Maybe Chapter)
 #### 🔐 用户系统
 - [x] 用户注册和登录功能
 - [x] 密码加密和安全存储（BCrypt哈希加密）
-- [x] 会话管理（基于IORef的内存会话）
+- [x] **会话管理（基于UUID令牌的会话隔离）**
 - [x] 退出登录功能
 
 #### 📚 书架功能
@@ -274,7 +300,7 @@ getChapterById :: Int -> IO (Maybe Chapter)
 - **数据库**: SQLite (sqlite-simple库)
 - **数据格式**: JSON (Aeson库)
 - **密码加密**: BCrypt (用于用户密码安全存储)
-- **会话管理**: IORef (内存会话管理)
+- **会话管理**: UUID令牌 + Cookie存储 (真正的多用户会话隔离)
 - **HTML表单处理**: Scotty的表单参数处理
 
 ## 开发说明

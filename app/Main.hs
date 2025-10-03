@@ -29,6 +29,10 @@ import qualified Data.ByteString.Char8 as BSC
 import Control.Exception (try, SomeException)
 import Data.IORef
 import System.IO.Unsafe (unsafePerformIO)
+import qualified Data.Map as M
+import qualified Data.UUID as UUID
+import qualified Data.UUID.V4 as UUIDV4
+import Data.List (find)
 
 -- 用户数据结构
 data User = User
@@ -490,17 +494,70 @@ aboutPage = do
         H.li "个人书架功能，收藏喜欢的小说"
         H.li "用户登录注册，个性化体验"
 
--- 简单的会话管理（在实际项目中应该使用更安全的方案）
-type Session = Maybe User
+-- 会话管理
 
--- 全局变量存储当前登录用户（简化版，实际应该使用更安全的会话管理）
-currentUser :: IORef (Maybe User)
-currentUser = unsafePerformIO (newIORef Nothing)
+-- 会话令牌类型
+type SessionToken = UUID.UUID
 
--- 从请求中获取用户（简化版，使用内存存储）
+-- 会话存储：令牌 -> 用户ID
+sessionStore :: IORef (M.Map SessionToken Int)
+sessionStore = unsafePerformIO (newIORef M.empty)
+
+-- 生成新的会话令牌
+generateSessionToken :: IO SessionToken
+generateSessionToken = UUIDV4.nextRandom
+
+-- 从请求中获取用户（基于会话令牌）
 getUserFromRequest :: S.ActionM (Maybe User)
 getUserFromRequest = do
-    liftIO $ readIORef currentUser
+    -- 从Cookie中获取会话令牌
+    mToken <- S.header "Cookie"
+    case mToken of
+        Just cookie -> do
+            let tokenStr = extractSessionToken cookie
+            case tokenStr of
+                Just tokenStr' -> do
+                    case UUID.fromString tokenStr' of
+                        Just token -> do
+                            sessions <- liftIO $ readIORef sessionStore
+                            case M.lookup token sessions of
+                                Just userId -> liftIO $ getUserById userId
+                                Nothing -> return Nothing
+                        Nothing -> return Nothing
+                Nothing -> return Nothing
+        Nothing -> return Nothing
+
+-- 从Cookie字符串中提取会话令牌
+extractSessionToken :: T.Text -> Maybe String
+extractSessionToken cookie = 
+    let cookies = T.splitOn "; " cookie
+        sessionCookie = find (T.isPrefixOf "session_token=") cookies
+    in case sessionCookie of
+        Just cookie' -> Just $ T.unpack $ T.drop (T.length "session_token=") cookie'
+        Nothing -> Nothing
+
+-- 设置会话令牌
+setSessionToken :: Int -> S.ActionM ()
+setSessionToken userId = do
+    token <- liftIO generateSessionToken
+    liftIO $ modifyIORef' sessionStore (M.insert token userId)
+    S.setHeader "Set-Cookie" $ T.pack $ "session_token=" ++ UUID.toString token ++ "; Path=/; HttpOnly"
+
+-- 清除会话令牌
+clearSessionToken :: S.ActionM ()
+clearSessionToken = do
+    mToken <- S.header "Cookie"
+    case mToken of
+        Just cookie -> do
+            let tokenStr = extractSessionToken cookie
+            case tokenStr of
+                Just tokenStr' -> do
+                    case UUID.fromString tokenStr' of
+                        Just token -> liftIO $ modifyIORef' sessionStore (M.delete token)
+                        Nothing -> return ()
+                Nothing -> return ()
+        Nothing -> return ()
+    S.setHeader "Set-Cookie" "session_token=; Path=/; HttpOnly; Expires=Thu, 01 Jan 1970 00:00:00 GMT"
 
 -- 主程序
 main :: IO ()
@@ -567,8 +624,8 @@ main = do
             mUser <- liftIO $ authenticateUser (TS.pack username) (TS.pack password)
             case mUser of
                 Just user -> do
-                    -- 设置当前登录用户
-                    liftIO $ writeIORef currentUser (Just user)
+                    -- 设置会话令牌
+                    setSessionToken (userId user)
                     S.redirect "/"
                 Nothing -> do
                     S.html $ R.renderHtml $ layout Nothing $ do
@@ -634,8 +691,8 @@ main = do
         
         -- 退出登录
         S.get "/logout" $ do
-            -- 清除当前登录用户
-            liftIO $ writeIORef currentUser Nothing
+            -- 清除会话令牌
+            clearSessionToken
             S.redirect "/"
         
         -- 关于页面

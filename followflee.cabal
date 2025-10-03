@@ -86,7 +86,9 @@ executable followflee
                      sqlite-simple >=0.4,
                      time >=1.9,
                      bcrypt >=0.0,
-                     cryptonite >=0.29
+                     cryptonite >=0.29,
+                     uuid >=1.3,
+                     containers >=0.6
 
     -- Directories containing source files.
     hs-source-dirs:   app
