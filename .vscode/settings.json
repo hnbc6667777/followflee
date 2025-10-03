@@ -1,0 +1,27 @@
+{
+  "terminal.integrated.profiles.windows": {
+    // ... 系统原有的其他配置（如PowerShell、Command Prompt等）请保留 ...
+    "MSYS2 MingW64": {
+      "path": "D:\\ghcup\\msys64\\msys2_shell.cmd", // 使用cmd作为启动器
+      "args": [
+        "-defterm",
+        "-mingw64",
+        "-here",
+        "-no-start",
+        "-shell",
+        "bash",
+        "-use-full-path"
+      ],
+      "env": {
+        // 设置MSYS2环境变量:cite[9]
+        "MSYSTEM": "MINGW64",
+        "CHERE_INVOKING": "1",
+        "MSYS2_PATH_TYPE": "inherit"
+      },
+      "icon": "terminal-bash", // 可选：设置一个图标
+      "color": "terminal.ansiGreen" // 可选：设置终端颜色
+    }
+  },
+  // （可选）将MSYS2设置为打开终端时的默认选项
+  "terminal.integrated.defaultProfile.windows": "MSYS2 MingW64"
+}
