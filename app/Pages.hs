@@ -73,6 +73,17 @@ chapterPage novel chapter prevChapter nextChapter = do
         H.button ! A.onclick "changeFontSize('medium')" $ "中"
         H.button ! A.onclick "changeFontSize('large')" $ "大"
         H.button ! A.onclick "changeFontSize('xlarge')" $ "特大"
+    H.div ! A.class_ "text-color-controls" ! A.id "text-color-controls-panel" $ do
+        H.p ! A.style "margin-bottom: 10px; font-weight: bold;" $ "文字颜色："
+        H.div ! A.style "display: flex; gap: 10px; margin-bottom: 10px;" $ do
+            H.button ! A.onclick "changeTextColor('black')" ! A.style "background-color: #000000; color: white; border: 1px solid #ccc; padding: 5px 10px; cursor: pointer;" $ "黑色"
+            H.button ! A.onclick "changeTextColor('dark-gray')" ! A.style "background-color: #333333; color: white; border: 1px solid #ccc; padding: 5px 10px; cursor: pointer;" $ "深灰"
+            H.button ! A.onclick "changeTextColor('gray')" ! A.style "background-color: #666666; color: white; border: 1px solid #ccc; padding: 5px 10px; cursor: pointer;" $ "灰色"
+            H.button ! A.onclick "changeTextColor('brown')" ! A.style "background-color: #8B4513; color: white; border: 1px solid #ccc; padding: 5px 10px; cursor: pointer;" $ "棕色"
+            H.button ! A.onclick "changeTextColor('dark-blue')" ! A.style "background-color: #000080; color: white; border: 1px solid #ccc; padding: 5px 10px; cursor: pointer;" $ "深蓝"
+        H.div ! A.style "display: flex; align-items: center; gap: 10px;" $ do
+            H.span "自定义："
+            H.input ! A.type_ "color" ! A.onchange "changeCustomTextColor(this.value)" ! A.style "width: 50px; height: 30px;"
     H.div ! A.class_ "background-controls" ! A.id "background-controls-panel" $ do
         H.p ! A.style "margin-bottom: 10px; font-weight: bold;" $ "背景颜色："
         H.div ! A.style "display: flex; gap: 10px; margin-bottom: 10px;" $ do
@@ -85,7 +96,8 @@ chapterPage novel chapter prevChapter nextChapter = do
             H.input ! A.type_ "color" ! A.onchange "changeCustomBackgroundColor(this.value)" ! A.style "width: 50px; height: 30px;"
 
     H.button ! A.id "toggle-font-controls" ! A.class_ "btn btn-secondary" ! A.style "position: fixed; top: 60px; right: 20px; z-index: 1001;" ! A.onclick "toggleFontControls()" $ "字体设置"
-    H.button ! A.id "toggle-background-controls" ! A.class_ "btn btn-secondary" ! A.style "position: fixed; top: 100px; right: 20px; z-index: 1001;" ! A.onclick "toggleBackgroundControls()" $ "背景设置"
+    H.button ! A.id "toggle-text-color-controls" ! A.class_ "btn btn-secondary" ! A.style "position: fixed; top: 100px; right: 20px; z-index: 1001;" ! A.onclick "toggleTextColorControls()" $ "文字颜色"
+    H.button ! A.id "toggle-background-controls" ! A.class_ "btn btn-secondary" ! A.style "position: fixed; top: 140px; right: 20px; z-index: 1001;" ! A.onclick "toggleBackgroundControls()" $ "背景设置"
     H.h1 $ toHtml (chapterTitle chapter)
     H.p $ do
         H.strong "小说："
