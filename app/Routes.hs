@@ -213,6 +213,12 @@ routes = do
     -- 关于页面
     S.get "/about" $ do
         S.html $ layout "关于" aboutPage
+    
+    -- 搜索页面
+    S.get "/search" $ do
+        query <- S.param "q"
+        novels <- liftIO $ searchNovels query
+        S.html $ layout ("搜索: " <> query) (searchPage novels query)
 
 -- 辅助函数：从阅读进度获取小说ID
 getNovelFromProgress :: ReadingProgress -> Novel

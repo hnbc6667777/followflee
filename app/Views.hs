@@ -10,6 +10,7 @@ module Views
     , registerPage
     , bookshelfPage
     , aboutPage
+    , searchPage
     , novelCard
     , novelCardWithProgress
     ) where
@@ -17,3 +18,4 @@ module Views
 import Layout (layout, Html)
 import Pages (homePage, novelsPage, novelDetailPage, chapterPage, loginPage, registerPage, bookshelfPage, aboutPage)
 import Components (novelCard, novelCardWithProgress)
+import Search (searchPage)

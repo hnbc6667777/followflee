@@ -38,6 +38,9 @@ layout title content = renderHtml $ docTypeHtml $ do
                     H.a ! A.href "/novels" $ "小说列表"
                     H.a ! A.href "/bookshelf" $ "我的书架"
                     H.a ! A.href "/about" $ "关于"
+                    H.form ! A.class_ "search-form" ! A.action "/search" ! A.method "get" $ do
+                        H.input ! A.type_ "text" ! A.name "q" ! A.placeholder "搜索小说..." ! A.class_ "search-input"
+                        H.button ! A.type_ "submit" ! A.class_ "search-button" $ "搜索"
             H.div ! A.class_ "main" $ do
                 H.div ! A.class_ "container" $ content
             H.div ! A.class_ "footer" $ do
@@ -95,6 +98,14 @@ cssStyles = T.unlines
     , ".alert { padding: 1rem; border-radius: 4px; margin-bottom: 1rem; }"
     , ".alert-success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }"
     , ".alert-error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }"
+    , ".search-form { display: flex; margin: 1rem 0; }"
+    , ".search-input { flex: 1; padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px 0 0 4px; font-size: 1rem; }"
+    , ".search-button { padding: 0.5rem 1rem; background: #3498db; color: white; border: none; border-radius: 0 4px 4px 0; cursor: pointer; }"
+    , ".search-button:hover { background: #2980b9; }"
+    , ".search-results { margin-top: 2rem; }"
+    , ".result-count { color: #7f8c8d; margin-bottom: 1rem; }"
+    , ".no-results { text-align: center; color: #7f8c8d; font-size: 1.2rem; margin: 2rem 0; }"
+    , ".page-title { color: #2c3e50; margin-bottom: 1rem; }"
     ]
 
 javascriptCode :: T.Text

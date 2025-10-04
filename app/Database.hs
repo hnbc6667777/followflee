@@ -18,6 +18,7 @@ module Database
     , getNovelById
     , getChaptersByNovelId
     , getChapterById
+    , searchNovels
     ) where
 
 import qualified Data.Text as TS
@@ -260,3 +261,12 @@ getChapterById novelId chapterId = do
     case chapters of
         [chapter] -> return (Just chapter)
         _ -> return Nothing
+
+-- 搜索小说
+searchNovels :: T.Text -> IO [Novel]
+searchNovels searchQuery = do
+    conn <- open databasePath
+    let searchPattern = T.pack ("%" <> T.unpack searchQuery <> "%")
+    novels <- query conn "SELECT id, title, author, description, created_at FROM novels WHERE title LIKE ? OR author LIKE ? OR description LIKE ? ORDER BY created_at DESC" (searchPattern, searchPattern, searchPattern)
+    close conn
+    return novels
